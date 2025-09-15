@@ -1,22 +1,39 @@
 'use client'
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Modal from "../modal";
 import Swal from "sweetalert2";
 import axios from "axios";
 import { config } from "@/app/config";
+import dayjs from "dayjs";
 
 export default function RepairPage() {
     const [isShowModal, setIsShowModal] = useState(false);
     const [name, setName] = useState('');
     const [price, setPrice] = useState(0);
     const [remark, setRemark] = useState('');
-    const [id, setId] = useState(0);
-    const [repairs, setRepaires] = useState([]);
+    const [id, setId] = useState('');
+    const [repairs, setRepairs] = useState([]);
+
+    useEffect(() => {
+        fetchData()
+    },[])
+
+    const fetchData = async () => {
+        try {
+            const res = await axios.get(`${config.apiUrl}/service/list`);
+            setRepairs(res.data);
+        } catch (error : any) {
+            Swal.fire({
+                icon: 'error',
+                title: 'ผิดพลาด',
+                text: error.message
+            })
+        }
+    }
 
     const handleOpenModal = () => {
         setIsShowModal(true);
-        setId(id);
     }
 
     const handleCloseModal = () => {
@@ -30,10 +47,16 @@ export default function RepairPage() {
                 price: price,
                 remark: remark
             }
+            console.log(id)
+            if (id !== '') {
+                await axios.put(`${config.apiUrl}/service/update/${id}`, payload)                
+            }else{
+                await axios.post(`${config.apiUrl}/service/create`, payload)
+            }
 
-            const res = await axios.post(`${config.apiUrl}/service/create`, payload)
             handleClearForm();
             handleCloseModal();
+            fetchData();
             
         } catch (error : any) {
             Swal.fire({
@@ -50,6 +73,45 @@ export default function RepairPage() {
         setRemark('');
     }
 
+    const handleDelete = async (id: number) => {
+        try {
+            const button = await Swal.fire({
+                icon: 'question',
+                title: 'คุณต้องการลบข้อมูลนี้ใช่หรือไม่?',
+                showCancelButton: true,
+                showConfirmButton: true,
+            })
+
+            if (button.isConfirmed) {
+                await axios.delete(`${config.apiUrl}/service/remove/${id}`)
+                Swal.fire({
+                    icon: 'success',
+                    title: 'ลบข้อมูลสำเร็จ',
+                    timer: 2000
+                })
+                fetchData()
+            }
+        } catch (error : any) {
+            Swal.fire({
+                icon: 'error',
+                title: 'ผิดพลาด',
+                text: error.message
+            })
+        }
+    }
+
+    const handleEdit = (id: number) => {
+        const repair = repairs.find((repair : any) => repair.id === id) as any;
+        console.log(repair.id)
+        if (repair) {
+            setId(repair.id);
+            setName(repair.name);
+            setPrice(repair.price);
+            setRemark(repair.remark);
+            handleOpenModal()
+        }
+    }
+
     return (
         <div>
             <h1 className="content-header">งานบริการ</h1>
@@ -58,6 +120,36 @@ export default function RepairPage() {
                     <i className="fa-solid fa-plus mr-2"></i>
                     บันทึกงานบริการ
                 </button>
+
+                <table className="table mt-5">
+                    <thead>
+                        <tr>
+                            <th className="text-left">ชื่องานบริการ</th>
+                            <th className="text-right">ราคา</th>
+                            <th className="text-left">หมายเหตุ</th>
+                            <th className="text-left">วันที่จดบันทึก</th>
+                            <th className="w-[120px]"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {repairs.map((repair : any) => (
+                            <tr key={repair.id}>
+                                <td className="text-left">{repair.name}</td>
+                                <td className="text-right">{repair.price.toLocaleString()}</td>
+                                <td className="text-left">{repair.remark}</td>
+                                <td className="text-left">{dayjs(repair.payDate).format('DD/MM/YYYY')}</td>
+                                <td className="text-center">
+                                    <button className="btn-edit mr-1" onClick={() => handleEdit(repair.id)}>
+                                        <i className="fa-solid fa-pen"></i>
+                                    </button>
+                                    <button className="btn-delete" onClick={() => handleDelete(repair.id)}>
+                                        <i className="fa-solid fa-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
             </div>
             <Modal isOpen={isShowModal} title="บันทึกงานบริการ" onClose={handleCloseModal} >
                 <div>
